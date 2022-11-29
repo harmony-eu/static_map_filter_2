@@ -118,9 +118,11 @@ class LaserStaticMapFilter(Node):
 
         for idx in range(max(np.shape(points_np))):
             if self._filter(points_np_tf[idx]):
+                # this makes sure that points_f is in the same frame as the original pointcloud
                 points_f.append([points_np[idx, 0], points_np[idx, 1], points_np[idx, 2]])
         points_np_f = np.array(points_f)
-        scan_f = create_cloud_xyz32(header=scan.header, points=points_np_f)
+        scan_f: PointCloud2 = create_cloud_xyz32(header=scan.header, points=points_np_f)
+        scan_f.header.frame_id = scan.header.frame_id
         self._filtered_pub.publish(scan_f)
 
 
