@@ -39,6 +39,9 @@ class LaserStaticMapFilter(Node):
 
     def __init__(self):
         super().__init__('laser_static_map_filter')
+        self.declare_parameter('nmcl', False)
+        self.nmcl_scan = self.get_parameter('nmcl').value
+
         self._ogm = OccupancyGridManager()
         # subscribe to map topic
         self._map_sub = self.create_subscription(OccupancyGrid, "/map", self._ogm._occ_grid_cb, 1)
@@ -101,11 +104,15 @@ class LaserStaticMapFilter(Node):
 
     def _scan_callback_2(self, scan: PointCloud2):
         if not self._check(scan): return
-        # fix corrupted pointcloud
-        # w = copy.deepcopy(scan.fields[2])
-        # w.name = "intensity"
-        # w.offset = 12
-        # scan.fields.append(w)
+        if self.nmcl_scan:
+            # fix corrupted pointcloud
+            self.get_logger().warning(
+                message="assuming scan comes from Bonn node and thus the header needs to be edited",
+                throttle_duration_sec=3.0)
+            w = copy.deepcopy(scan.fields[2])
+            w.name = "intensity"
+            w.offset = 12
+            scan.fields.append(w)
 
 
         # points_np = read_points_numpy(scan, skip_nans=True, reshape_organized_cloud=False)
