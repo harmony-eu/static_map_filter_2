@@ -56,6 +56,7 @@ class LaserStaticMapFilter(Node):
 
         self._scan_sub = self.create_subscription(PointCloud2, "/scan", self._scan_callback_2, 1)
         self._filtered_pub = self.create_publisher(PointCloud2, "/scan_filtered", 1)
+        self._filtered_static_pub = self.create_publisher(PointCloud2, "/scan_filtered_static", 1)
 
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, node=self)
@@ -81,7 +82,12 @@ class LaserStaticMapFilter(Node):
         except(IndexError):
             self.get_logger().warning(message="Received points outside of gridmap.", throttle_duration_sec=3.0)
             return False
-        return cost >= 0 and cost < 100
+        if cost >= 0 and cost < 100: #free space
+            return 1
+        elif cost == 100: #occupied
+            return 0
+        else:
+            return -1
 
     def _check(self, pointcloud):
         if self._ogm is None or self._ogm._occ_grid_metadata is None and self._ogm._grid_data is None:
@@ -122,15 +128,26 @@ class LaserStaticMapFilter(Node):
         if len(np.shape(points_np)) < 2: return
         points_np_tf = do_transform_cloud(copy.deepcopy(points_np), self._current_transform.transform)
         points_f  = list()
+        points_f_static = list()
 
         for idx in range(max(np.shape(points_np))):
-            if self._filter(points_np_tf[idx]):
+            free_space = self._filter(points_np_tf[idx])
+            if free_space == 1:
                 # this makes sure that points_f is in the same frame as the original pointcloud
                 points_f.append([points_np[idx, 0], points_np[idx, 1], points_np[idx, 2]])
+            elif free_space == 0:
+                # these are the points that are part of the static map
+                points_f_static.append([points_np[idx, 0], points_np[idx, 1], points_np[idx, 2]])
+                
         points_np_f = np.array(points_f)
         scan_f: PointCloud2 = create_cloud_xyz32(header=scan.header, points=points_np_f)
         scan_f.header.frame_id = scan.header.frame_id
         self._filtered_pub.publish(scan_f)
+
+        points_np_f_static = np.array(points_f_static)
+        scan_f_static: PointCloud2 = create_cloud_xyz32(header=scan.header, points=points_np_f_static)
+        scan_f_static.header.frame_id = scan.header.frame_id
+        self._filtered_static_pub.publish(scan_f_static)
 
 
 def main(args=None):
