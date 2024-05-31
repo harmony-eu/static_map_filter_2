@@ -123,7 +123,11 @@ class LaserStaticMapFilter(Node):
 
         # points_np = read_points_numpy(scan, skip_nans=True, reshape_organized_cloud=False)
         points = read_points(scan, skip_nans=True, reshape_organized_cloud=False)
-        points_np = np.array([[point[0], point[1], point[2]] for point in points])
+        # filter out lidar points that are on the robot, i.e. closer to the robot than 0.4m. 
+        points_np = np.empty((0, 3))
+        for point in points:
+            if np.linalg.norm([point[0], point[1]]) > 0.4:
+                points_np = np.append(points_np, np.array([[point[0], point[1], point[2]]], axis=0)
         # guard against empty pointclouds
         if len(np.shape(points_np)) < 2: return
         points_np_tf = do_transform_cloud(copy.deepcopy(points_np), self._current_transform.transform)
